@@ -1,0 +1,8 @@
+{
+  "model": "Evo2 7B",
+  "game_schema_version": "1.0",
+  "publication" : "Brixi, G., Durrant, M.G., Ku, J. et al. 2026",
+  "container_authors": ["Ishika Luthra", "Satyam Priyadarshi"],
+  "description": "Multi-species DNA language model. 7B parameter model with 1M context",
+  "bin_size": 1
+}

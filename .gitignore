@@ -1,0 +1,12 @@
+# big binaries -- never commit
+*.sif
+*.pt
+
+# python junk
+__pycache__/
+*.pyc
+*.egg-info/
+
+# logs & test run artifacts
+*.log
+test/smoketest_info/
