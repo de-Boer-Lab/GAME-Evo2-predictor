@@ -1,9 +1,0 @@
-{
-  "model": "Evo2 Predictor 7B",
-  "version": "1.0",
-  "publication" : "Brixi, G., Durrant, M.G., Ku, J. et al. 2026",
-  "build_date": "Nov 6th, 2025",
-  "container_authors": ["Ishika Luthra", "Satyam Priyadarshi"],
-  "description": "Multi-species DNA languange model. 7B parameter model with 1M context",
-  "bin_size": 1
-}

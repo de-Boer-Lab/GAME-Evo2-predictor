@@ -1,0 +1,127 @@
+Bootstrap: localimage
+From: ./evo2/evo2.sif
+
+%files
+    ./config.py /opt/evo2-predictor/config.py
+    ./predictor_RestAPI.py /opt/evo2-predictor/predictor_RestAPI.py
+    ./evo2_utils.py /opt/evo2-predictor/evo2_utils.py
+    ./error_checking_functions.py /opt/evo2-predictor/error_checking_functions.py
+    ./predictor_content_handler.py /opt/evo2-predictor/predictor_content_handler.py
+    ./predictor_help_message.json /opt/evo2-predictor/predictor_help_message.json
+    ./schema_validation.py /opt/evo2-predictor/schema_validation.py
+    
+    # Copy the modified package, leaving behind large files (sif, notebooks, etc)
+    ./evo2/evo2 /opt/evo2-predictor/evo2/evo2
+    ./evo2/pyproject.toml /opt/evo2-predictor/evo2/pyproject.toml
+    ./evo2/README.md /opt/evo2-predictor/evo2/README.md
+    ./evo2/LICENSE /opt/evo2-predictor/evo2/LICENSE
+
+    # Copy the single raw PyTorch weights file
+    ./weights/evo2_7b.pt /opt/evo2-predictor/weights/evo2_7b.pt
+
+%environment
+    export APPTAINER_NO_MOUNT="home,tmp,proc,sys,dev"
+    export LC_ALL=C
+    export TRITON_CACHE_DIR=/tmp/triton_cache
+    export XDG_CACHE_HOME=/tmp/xdg_cache
+
+    export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+    
+    # Point Evo 2 directly to the baked weights file
+    export EVO2_WEIGHTS=/opt/evo2-predictor/weights/evo2_7b.pt
+   
+%post
+    # Fail the build instantly if any command fails
+    set -e
+
+    echo "Installing API dependencies..."
+    python3 -m pip install --no-cache-dir flask msgpack
+
+    # Install the modified evo2 package over the base image version.
+    echo "Installing modified Evo 2 package..."
+    python3 -m pip install -e /opt/evo2-predictor/evo2 --no-deps --force-reinstall
+    
+    echo "Setting permissions..."
+    chmod -R 755 /opt/evo2-predictor/
+
+    # Verification: Ensure the track function imports successfully against base dependencies
+    echo "Running verification checks..."
+    python3 -c "import evo2, torch; from evo2.scoring import score_sequences_track; print('Evo 2 + track import OK')"
+    test -s /opt/evo2-predictor/weights/evo2_7b.pt && echo "Evo 2 Weights Verified"
+
+    # # Install system packages and dependencies
+    # echo "Installing system dependencies..."
+    # apt-get update && \
+    # apt-get install -y --no-install-recommends python3-pip bzip2 ca-certificates && \
+    # apt-get clean && rm -rf /var/lib/apt/lists/*
+
+    # echo "Upgrading pip..."
+    # python3 -m pip install --upgrade pip
+
+    # # Consolidate all script dependencies into a single install command
+    # echo "Installing Python dependencies..."
+    # python3 -m pip install --no-cache-dir \
+    #     numpy \
+    #     tqdm \
+    #     pandas \
+    #     msgpack \
+    #     scipy \
+    #     flask \
+    #     waitress \
+    #     biopython
+
+    # # Install the modified evo2 package over the base image version.
+    # # --no-deps ensures we don't break the base image's PyTorch/Vortex installations
+    # echo "Installing modified Evo 2 package..."
+    # python3 -m pip install -e /opt/evo2-predictor/evo2 --no-deps --force-reinstall
+    
+    # # Set permissions to access all directories
+    # echo "Setting permissions for directories and script..."
+    # chmod -R 755 /opt/evo2-predictor/
+
+    # # Verification: Ensure the track function imports successfully against base dependencies
+    # echo "Running verification checks..."
+    # python3 -c "import evo2, torch; from evo2.scoring import score_sequences_track; print('Evo 2 + track import OK')"
+    
+    # # Verification: Ensure weights are present
+    # test -s /opt/evo2-predictor/weights/evo2_7b.pt && echo "Evo 2 Weights Verified"
+
+%runscript
+    exec python3 /opt/evo2-predictor/predictor_RestAPI.py "$@"
+
+%startscript
+    exec python3 /opt/evo2-predictor/predictor_RestAPI.py "$@"
+
+%labels
+    Authors "Ishika Luthra"
+    game_schema_version "1.0"
+    Description "Self-contained RESTful Evo 2 7B Predictor for the GAME framework"
+
+%help
+    Evo 2 (7B) Predictor for the Genomic API for Model Evaluation (GAME) framework.
+
+    This container serves a Flask-based REST API that wraps the Evo 2 7B DNA language model (Brixi et al., Nature 2026; Arc Institute),
+    a StripedHyena 2 autoregressive model run via the Vortex inference engine. Pre-trained 7B weights are baked into the image and 
+    loaded directly (no download at runtime). Requires an NVIDIA GPU, ideally H100s.
+
+    Endpoints:
+      POST /predict   — submit sequences + prediction_tasks, receive predictions
+      GET  /help      — this Predictor metadata (predictor_help_message.json)
+      GET  /formats   — supported request/response wire formats (JSON, MessagePack)
+
+    Support scripts:
+      - predictor_RestAPI.py         — Flask REST API and request orchestration
+      - evo2_utils.py                — model loading + point/track prediction logic
+      - config.py                    — container-aware Predictor versioning
+      - schema_validation.py         — request payload validation and preprocessing
+      - error_checking_functions.py  — standardized error classes and checks
+      - predictor_content_handler.py — JSON / MessagePack content negotiation
+      - predictor_help_message.json  — Predictor metadata served via /help
+
+    Run the container (GPU required, no Matcher, yet):
+
+        apptainer run --nv --containall evo2_predictor.sif 172.xx.xx.xxx 5000
+
+    Arguments:
+      1. HOST:  IP address or hostname for the Predictor to bind to
+      2. PORT:  Port number the Predictor listens on
