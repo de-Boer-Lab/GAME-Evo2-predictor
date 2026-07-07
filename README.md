@@ -4,6 +4,14 @@ A [GAME](https://genomic-api-for-model-evaluation-documentation.readthedocs.io/)
 
 **Underlying model:** Brixi, G., Durrant, M.G., Ku, J., *et al.* 2026. Evo2 7B (1M-token context). See [arcinstitute/evo2](https://github.com/ArcInstitute/evo2).
 
+## Important Links
+
+- To learn more about the GAME Framework ([Main GAME Repository](https://github.com/de-Boer-Lab/Genomic-API-for-Model-Evaluation), [preprint](https://www.biorxiv.org/content/10.1101/2025.07.04.663250v1.full))
+- GAME Documentation: [ReadTheDocs](https://genomic-api-for-model-evaluation-documentation.readthedocs.io)
+- Pre-built Evo2-7B container image: [Hugging Face](https://huggingface.co/datasets/deBoerLab/Evo2_Predictor_GAME)
+- To learn more about Evo2: [Evo2 GitHub Repository](https://github.com/ArcInstitute/evo2)
+- List of all [GAME Modules](https://github.com/de-Boer-Lab/GAME_modules)
+
 ---
 
 ## Features
