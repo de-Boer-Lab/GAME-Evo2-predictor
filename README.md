@@ -1,6 +1,6 @@
 # Evo2 Predictor
 
-A [GAME](https://genomic-api-for-model-evaluation-documentation.readthedocs.io/)-compatible predictor that wraps the Evo2 7B DNA language model for use against any GAME Evaluator. Given a set of input sequences and prediction tasks, the Predictor returns either per-sequence or per-position likelihood scores from the model.
+A [GAME](https://genomic-api-for-model-evaluation-documentation.readthedocs.io/)-compatible Predictor that wraps the Evo2 7B DNA language model for use against any GAME Evaluator. Given a set of input sequences and prediction tasks, the Predictor returns either per-sequence or per-position likelihood scores from the model.
 
 **Underlying model:** Brixi, G., Durrant, M.G., Ku, J., *et al.* 2026. Evo2 7B (1M-token context). See [arcinstitute/evo2](https://github.com/ArcInstitute/evo2).
 
@@ -18,11 +18,12 @@ A [GAME](https://genomic-api-for-model-evaluation-documentation.readthedocs.io/)
 
 - **`point` readout** — one scalar score per sequence (mean log-likelihood).
 - **`track` readout** — one score per base, returned as an array per sequence.
-- **`log` and `linear` scales** — request either log-likelihoods or raw probabilities.
-- **`prediction_ranges`** — optionally restrict predictions to a sub-region of each input sequence. Evo2 conditions only on upstream context, so the sequence is cropped to `[0:end+1]` before scoring, and `track` outputs are cropped to `[start:end+1]` afterward.
+- **`log` and `linear` scales** — request either log-likelihoods or raw probabilities. Note that for `point` requests the `linear` value is `exp(mean(log p))`, i.e. the geometric mean of the per-base probabilities, not the arithmetic mean.
+- **`prediction_ranges`** — optionally restrict predictions to a sub-region of each input sequence. Evo2 conditions only on upstream context, so the sequence is cropped to `[0:range_end+1]` before scoring, and `track` outputs are cropped to `[range_start:range_end+1]` afterward. For `point` requests, the score is the mean log-likelihood over `[range_start:range_end+1]` only.
 - **Optional `upstream_seq` / `downstream_seq` flanks** — appended to every input sequence before scoring.
 - **JSON and MessagePack** wire formats, negotiated via `Content-Type` and `Accept` headers.
-- **Auto-versioned predictor name** — the Apptainer build date is appended to the Predictor name on container startup (e.g. `Evo2_7b_Predictor_20251128-180629_PST`) so every prediction is traceable to a specific container build.
+- **Auto-versioned Predictor name** — the Apptainer build date is appended to the Predictor name on container startup (e.g. `Evo2_7b_Predictor_20251128-180629_PST`) so every prediction is traceable to a specific container build.
+- **Maximum sequence length** — sequences longer than 1,048,576 bases (the model's context length) are rejected with a `prediction_request_failed` error.
 
 ---
 
@@ -34,11 +35,11 @@ apptainer build evo2_predictor.sif predictor.def
 
 The container is built from `python:3.13-slim` and installs `numpy`, `tqdm`, `pandas`, `msgpack`, `scipy`, `flask`, and `waitress`. The full Evo2 source (including modified scoring code) is copied in at build time from `../Evo2_Predictor`.
 
-> **GPU required.** Evo2 7B does not run on CPU. The Predictor requires at least one CUDA-capable GPU (one H100 is sufficient for the 7B model).
+> **H100 GPU required.** Evo2 7B does not run on CPU. The Predictor requires at least one CUDA-capable GPU (one H100 is sufficient for the 7B model).
 
 ---
 
-## Run the predictor
+## Run the Predictor
 
 ```bash
 apptainer run --nv evo2_predictor.sif <predictor_ip> <predictor_port>
@@ -49,7 +50,7 @@ apptainer run --nv evo2_predictor.sif <predictor_ip> <predictor_port>
 | `predictor_ip` | IP address or hostname to bind to (e.g. `0.0.0.0`) |
 | `predictor_port` | Port to listen on |
 
-The predictor exposes a REST API on `http://<predictor_ip>:<predictor_port>`.
+The Predictor exposes a REST API on `http://<predictor_ip>:<predictor_port>`.
 
 ---
 
@@ -95,7 +96,7 @@ The predictor exposes a REST API on `http://<predictor_ip>:<predictor_port>`.
 | `readout` | yes | `"point"` or `"track"`. `"interaction_matrix"` is not supported by Evo2 and will be rejected. |
 | `sequences` | yes | Dict of `{seq_id: sequence}`. Valid bases: `A`, `T`, `C`, `G`, `N`. |
 | `prediction_tasks` | yes | List of prediction-task objects (fields described below). |
-| `prediction_ranges` | optional | Dict of `{seq_id: [start, end]}`, inclusive and 0-indexed. Keys must match `sequences`. |
+| `prediction_ranges` | optional | Dict of `{seq_id: [start, end]}`, inclusive and 0-indexed. Keys must match `sequences`. Interpreted in post-flank coordinates when `upstream_seq`/`downstream_seq` are supplied. |
 | `upstream_seq` | optional | String prepended to every sequence before scoring. |
 | `downstream_seq` | optional | String appended to every sequence before scoring. |
  
@@ -150,7 +151,7 @@ Evo2_Predictor/
 ├── predictor.def                    # Apptainer build recipe
 ├── predictor_RestAPI.py             # Flask app and /predict, /help, /formats endpoints
 ├── evo2_utils.py                    # predict_evo2 — wraps the Evo2 model
-├── config.py                        # Auto-versions the predictor name
+├── config.py                        # Auto-versions the Predictor name
 ├── schema_validation.py             # Request validation and preprocessing
 ├── error_checking_functions.py      # APIError classes and validators
 ├── predictor_content_handler.py     # JSON / MessagePack encode + decode

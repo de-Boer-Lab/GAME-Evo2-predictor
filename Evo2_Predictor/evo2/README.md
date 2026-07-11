@@ -44,21 +44,17 @@ score_sequences_track  →  no reduction            →  (L,) array per sequence
 | `"log"` | `torch.log_softmax(logits, dim=-1)` | `(-∞, 0]` (natural log) |
 | `"linear"` | `torch.softmax(logits, dim=-1)` | `[0, 1]` |
 
-The two are related by `linear = exp(log)`. `log` is the default (and is the most natural output for a language model); `linear` is provided so an evaluator can request raw probabilities without doing the conversion itself.
+The two are related by `linear = exp(log)`. 
 
 ---
 
-## `prepend_bos` — why it differs from `score_sequences`
+## `prepend_bos` — the Predictor always uses `True`
 
-| Function | Default `prepend_bos` |
-|---|---|
-| `score_sequences` | `False` |
-| `score_sequences_track` | `True` |
+`predict_evo2` passes `prepend_bos=True` on every call, so all three paths (plain point, point+range, track) are BOS-aligned and consistent with one another.
 
+Why it matters: in `logits_to_logprobs`, the last logit is dropped (it predicts a token past the end of the sequence) and `input_ids` is shifted by 1 (the model predicts the *next* token at each position). Without a BOS token, the first base has nothing to condition on and gets no logprob — position 0 is dropped and every position shifts by one, so base *i* no longer sits at index *i*.
 
-In `logits_to_logprobs`, the last logit is dropped (it predicts a token past the end of the sequence) and `input_ids` is shifted by 1 (the model predicts the *next* token at each position). Without a BOS token, the first base of the sequence has nothing to condition on and gets no logprob — the returned track is implicitly missing position 0.
-
-For `score_sequences` this barely matters: one missing position out of thousands gets averaged away. For `score_sequences_track`, position 0 would be silently dropped from every track, breaking alignment with the input. Prepending BOS gives the model a starting context so position 0 of the sequence has a defined logprob, and the returned array length matches the input sequence length.
+Prepending BOS gives position 0 a defined logprob, makes the returned array length match the input length, and puts **base *i* at index *i***. That index alignment is what makes range slicing correct: the Predictor slices tracks to `[range_start:range_end+1]` for both `track` outputs and point+range means, and without BOS every one of those slices would be off by one and silently target the wrong bases.
 
 ---
 
@@ -68,15 +64,28 @@ Each returned element is a NumPy array of shape `(L,)` — one likelihood per in
 
 ---
 
-## How it's used by the predictor
+## How it's used by the Predictor
 
-`evo2_utils.predict_evo2` calls `score_sequences_track` for any `readout == "track"` request:
+`evo2_utils.predict_evo2` uses `score_sequences_track` for **two** paths — every `track` request, and `point` requests that carry `prediction_ranges`.
+
+**`track` readout.** The full per-base array is returned to the Evaluator:
 
 ```python
-predictions = evo2_model.score_sequences_track(seqs, scale=scale_actual)
+predictions = evo2_model.score_sequences_track(seqs, scale=scale_actual, prepend_bos=True)
 ```
 
-If `prediction_ranges` is present in the request, the input sequence is first cropped to `[0:end+1]` (full upstream context is preserved because Evo2 is autoregressive and only uses upstream tokens), then the returned track is cropped to `[start:end+1]` before being returned to the evaluator.
+**`point` readout with ranges.** A point+range score is exactly a track scored over the range, then averaged — so the same function is reused, scored in `log` (converted to `linear` afterward if requested), sliced to the range, and meaned:
+
+```python
+track = evo2_model.score_sequences_track(seqs, scale="log", prepend_bos=True)
+score = np.mean(track_i[start:end + 1])   # per sequence
+```
+
+(A `point` request *without* ranges instead uses the upstream `score_sequences`, called with `prepend_bos=True` so its scores stay consistent with the track-based paths.)
+
+**Range handling.** When `prediction_ranges` is present, the input sequence is first cropped to `[0:range_end+1]` before scoring. Full upstream context is preserved because Evo2 is autoregressive and only conditions on upstream tokens. After scoring, `track` outputs are cropped to `[range_start:range_end+1]` before being returned to the Evaluator.
+
+---
 
 
 ## Compatibility
