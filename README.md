@@ -121,11 +121,11 @@ The predictor exposes a REST API on `http://<predictor_ip>:<predictor_port>`.
     {
       "name": "K562_accessibility",
       "type_requested": "accessibility",
-      "type_actual": "accessibility",
+      "type_actual": "NA",
       "cell_type_requested": "K562",
-      "cell_type_actual": "K562",
+      "cell_type_actual": "NA",
       "species_requested": "human",
-      "species_actual": "human",
+      "species_actual": "NA",
       "scale_prediction_requested": "log",
       "scale_prediction_actual": "log",
       "predictions": {
@@ -139,7 +139,7 @@ The predictor exposes a REST API on `http://<predictor_ip>:<predictor_port>`.
 
 `bin_size` is only included for `track` responses (Evo2 returns one value per base, so `bin_size = 1`). For `point` responses, `predictions` values are scalars rather than arrays.
 
-Because Evo2 is a generative DNA language model, the `_actual` fields always match the corresponding `_requested` fields — the model can produce predictions for any cell type, species, or assay type requested.
+Because Evo2 is a generative DNA language model that does not condition on cell type, species or assay type, the corresponding `_actual` fields always return "NA", per GAME's convention for agnostic Predictors.
 
 ---
 

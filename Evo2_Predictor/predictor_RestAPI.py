@@ -132,11 +132,11 @@ def predict():
             current_prediction_task = {
                 "name": prediction_task["name"],
                 "type_requested": request_type,
-                "type_actual": request_type,  # Evo2 can return predictions for any request
+                "type_actual": "NA",
                 "cell_type_requested": cell_type,
-                "cell_type_actual": cell_type,  # Evo2 can return predictions for any request
+                "cell_type_actual": "NA",
                 "species_requested": prediction_task["species"],
-                "species_actual": prediction_task["species"],
+                "species_actual": "NA",
                 "scale_prediction_requested": scale_requested,
                 "scale_prediction_actual": scale_actual,
                 "predictions": task_prediction,
