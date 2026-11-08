@@ -48,13 +48,19 @@ def check_seqs_specifications(sequences, json_return_error_model):
     Check that sequences conform to model specs.
     - Valid bases: "A", "T", "C", "G", "N"
     - No empty sequences
+    - No sequences longer than Evo2's max context length
     """
-    # max_length = int(5e9)
+    #Max length is 1bp shorter than Evo2's max length due to prepend bos == TRUE in predictions
+    max_length = 1048575
     valid_bases = {"A", "T", "C", "G", "N"}
     for seq_id, seq in sequences.items():
         if not seq:
             json_return_error_model["prediction_request_failed"].append(f"sequence '{seq_id}' is empty")
         
+        if len(seq) > max_length:
+            json_return_error_model["prediction_request_failed"].append(
+                f"sequence '{seq_id}' has length {len(seq)}, which exceeds Evo2 7B max length of {max_length}")
+
         invalid_chars = set(seq.upper()) - valid_bases
         if invalid_chars:
             json_return_error_model['prediction_request_failed'].append(f"sequence '{seq_id}' has invalid character(s): {invalid_chars}")
@@ -217,13 +223,12 @@ def check_prediction_task_scale(prediction_tasks, json_return_error):
             pass
     return(json_return_error)
 
-def check_prediction_ranges(prediction_ranges, sequences, json_return_error):
+def check_prediction_ranges(prediction_ranges, json_return_error):
     """
     Checks that prediction_ranges are formatted correctly.
-    Now includes checks for positive integers and start <= end.
+    Includes checks for non-negative integers and start < end.
     """
     for key, value in prediction_ranges.items():
-        print(value)
         if not isinstance(value, list):
             json_return_error['bad_prediction_request'].append(f"Values for '{key}' in 'prediction_ranges' must be in a list")
             continue
@@ -243,10 +248,10 @@ def check_prediction_ranges(prediction_ranges, sequences, json_return_error):
         end = value[1]
         
         if start < 0 or end < 0:
-            json_return_error['bad_prediction_request'].append(f"Invalid range for '{key}' in 'prediction_ranges': indices must be positive. Received [{start}, {end}]")
+            json_return_error['bad_prediction_request'].append(f"Invalid range for '{key}' in 'prediction_ranges': indices must be non-negative. Received [{start}, {end}]")
             
-        if start > end:
-            json_return_error['bad_prediction_request'].append(f"Invalid range for '{key}' in 'prediction_ranges': start index ({start}) cannot be greater than end index ({end}). Received [{start}, {end}]")
+        if start >= end:
+            json_return_error['bad_prediction_request'].append(f"Invalid range for '{key}' in 'prediction_ranges': start index ({start}) must be less than end index ({end}). Received [{start}, {end}]")
 
 
     return json_return_error

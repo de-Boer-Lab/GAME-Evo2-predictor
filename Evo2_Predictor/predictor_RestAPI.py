@@ -113,7 +113,7 @@ def predict():
                 "prediction_tasks": [],
             }
 
-        if readout_type in ["point"]:
+        else:
             json_return = {
                 'predictor_name': PREDICTOR_NAME,
                 # Prediction task is an array of objects for all requested tasks
@@ -132,11 +132,11 @@ def predict():
             current_prediction_task = {
                 "name": prediction_task["name"],
                 "type_requested": request_type,
-                "type_actual": request_type,  # Evo2 can return predictions for any request
+                "type_actual": ["sequence_likelihood"],  # Evo2 returns sequence likelihood, not a specific assay type
                 "cell_type_requested": cell_type,
-                "cell_type_actual": cell_type,  # Evo2 can return predictions for any request
+                "cell_type_actual": None,  # Evo2 can return predictions for any request
                 "species_requested": prediction_task["species"],
-                "species_actual": prediction_task["species"],
+                "species_actual": None,
                 "scale_prediction_requested": scale_requested,
                 "scale_prediction_actual": scale_actual,
                 "predictions": task_prediction,

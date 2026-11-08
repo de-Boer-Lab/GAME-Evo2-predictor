@@ -10,3 +10,4 @@ __pycache__/
 # logs & test run artifacts
 *.log
 test/smoketest_info/
+.DS_Store

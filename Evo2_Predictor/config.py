@@ -2,8 +2,8 @@
 Configuration script for Evo2 Predictor
 - Determines if running inside a container or not
 - Automatically versions the Predictor name using Apptainer's build-date label.
-- Inside container:             "Evo2_20251128-180629_TZ"  (sortable, human-readable)
-- Outside container (Dev mode): "Evo2_dev"
+- Inside container:             "Evo2_7b_20251128-180629_TZ"  (sortable, human-readable)
+- Outside container (Dev mode): "Evo2_7b_dev"
 '''
 
 import os
@@ -36,17 +36,18 @@ if os.path.exists('/.singularity.d'):
         dt = datetime.strptime(date_str, "%d_%B_%Y_%H:%M:%S")
         build_timestamp = dt.strftime("%Y%m%d-%H%M%S")
         timezone_label = parts[5] if len(parts) > 5 else "UNK"
-        PREDICTOR_NAME = f"{MODEL_NAME}_Predictor_{build_timestamp}_{timezone_label}"
+
+        PREDICTOR_NAME = f"{MODEL_NAME}_{build_timestamp}_{timezone_label}"
         
     except Exception as e:
         print(f"Warning: Could not parse build timestamp from labels.json: {e}")
-        PREDICTOR_NAME = f"{MODEL_NAME}_Predictor_unknown"
+        PREDICTOR_NAME = f"{MODEL_NAME}_unknown"
 else:
     # Running outside the container
     print("Running outside the container...")
     PREDICTOR_CONTAINER_DIR = os.path.dirname(SCRIPT_DIR)
     HELP_FILE = os.path.join(SCRIPT_DIR, 'predictor_help_message.json')
-    PREDICTOR_NAME = f"{MODEL_NAME}_Predictor_dev"
+    PREDICTOR_NAME = f"{MODEL_NAME}_dev"
 
 
 # ------ Configuration for Wire-Format ------

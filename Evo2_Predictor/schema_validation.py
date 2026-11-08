@@ -32,7 +32,7 @@ def validate_request_payload(payload):
 
     if 'prediction_ranges' in payload:
         errors = check_seq_ids(payload['prediction_ranges'], payload['sequences'], errors)
-        errors = check_prediction_ranges(payload['prediction_ranges'], payload['sequences'], errors)
+        errors = check_prediction_ranges(payload['prediction_ranges'], errors)
 
     if 'upstream_seq' in payload:
         errors = check_key_values_upstream_flank(payload['upstream_seq'], errors)
@@ -84,18 +84,25 @@ def preprocess_data(payload):
                 start, end = pr
                 seq_len = len(sequences[seq_id])
 
-                if start >= seq_len or end >= seq_len:
+                if start >= seq_len or end > seq_len:
                     # Handle the empty sequence case for a clean message
                     if seq_len == 0:
                         err_msg = f"Invalid range for '{seq_id}': cannot specify a range for a non-existent or empty sequence."
                     else:
-                        err_msg = f"Invalid range for '{seq_id}': index is out of bounds. The maximum valid index for a sequence of length {seq_len} is {seq_len - 1}."
+                        err_msg = f"Invalid range for '{seq_id}': index is out of bounds. For a sequence of length {seq_len}, start must be < {seq_len} and end must be <= {seq_len}."                   
                     errors['prediction_request_failed'].append(err_msg)
-            
+                    
     # Model-specific error checking: Readout type check
     readout_type = payload['readout']
     if not readout_type in ["point", "track"]:
-        raise BadRequestError(f"Test Predictor cannot process '{readout_type}' readout type.")
+        raise PredictionFailedError(f"Evo2 cannot process '{readout_type}' readout type.")
+
+    
+    # Model-specific error checking: Prediction task type check
+    for prediction_task in payload['prediction_tasks']:
+        if prediction_task['type'].startswith('conformation_'):
+            errors['prediction_request_failed'].append(
+                f"Evo2 cannot process '{prediction_task['type']}' prediction type.")
 
     if any(errors.values()):
         flagged_errors = [msg for sublist in errors.values() for msg in sublist]
