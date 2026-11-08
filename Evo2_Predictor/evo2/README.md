@@ -18,12 +18,12 @@ The new functions mirror the structure of the upstream `score_sequences`: a publ
 
 ## The scoring idea for track requests
 
-Evo2 is an autoregressive DNA language model: at each position it outputs a distribution over the vocabulary predicting the *next* token. For a sequence of length `L`, the model produces logits of shape `(L, vocab)`.
+Evo2 is an autoregressive DNA language model: at each position it outputs a distribution over the vocabulary predicting the *next* token. For a sequence of length `L`, the model produces logits of shape `(L + 1, vocab)` when a BOS token is prepended (`(L, vocab)` without).
 
 The original `score_sequences` reduces these to a single scalar per sequence:
 
-1. Softmax → log-probabilities, shape `(L, vocab)`.
-2. Gather along the vocab dimension using the observed token IDs → shape `(L,)`. This pulls out, for each position, the log-probability the model assigned to the actual base that appears next.
+1. Softmax → log-probabilities over the vocab at each position.
+2. Gather along the vocab dimension using the observed token IDs → shape `(L,)` with BOS (`(L−1,)` without; see `prepend_bos` below). This pulls out, for each position, the log-probability the model assigned to the actual base that appears next.
 3. Reduce (`mean` or `sum`) across positions → one scalar per sequence
 
 `score_sequences_track` keeps steps 1–2 and **skips the reduction**, returning the per-position array directly.
@@ -54,7 +54,7 @@ The two are related by `linear = exp(log)`.
 
 Why it matters: in `logits_to_logprobs`, the last logit is dropped (it predicts a token past the end of the sequence) and `input_ids` is shifted by 1 (the model predicts the *next* token at each position). Without a BOS token, the first base has nothing to condition on and gets no logprob — position 0 is dropped and every position shifts by one, so base *i* no longer sits at index *i*.
 
-Prepending BOS gives position 0 a defined logprob, makes the returned array length match the input length, and puts **base *i* at index *i***. That index alignment is what makes range slicing correct: the Predictor slices tracks to `[range_start:range_end+1]` for both `track` outputs and point+range means, and without BOS every one of those slices would be off by one and silently target the wrong bases.
+Prepending BOS gives position 0 a defined logprob, makes the returned array length match the input length, and puts **base *i* at index *i***. That index alignment is what makes range slicing correct: the Predictor slices tracks to `[range_start:range_end]` (half-open) for both `track` outputs and point+range means, and without BOS every one of those slices would be off by one and silently target the wrong bases.
 
 ---
 
@@ -78,12 +78,12 @@ predictions = evo2_model.score_sequences_track(seqs, scale=scale_actual, prepend
 
 ```python
 track = evo2_model.score_sequences_track(seqs, scale="log", prepend_bos=True)
-score = np.mean(track_i[start:end + 1])   # per sequence
+score = np.mean(track_i[start:end])   # per sequence, half-open range
 ```
 
 (A `point` request *without* ranges instead uses the upstream `score_sequences`, called with `prepend_bos=True` so its scores stay consistent with the track-based paths.)
 
-**Range handling.** When `prediction_ranges` is present, the input sequence is first cropped to `[0:range_end+1]` before scoring. Full upstream context is preserved because Evo2 is autoregressive and only conditions on upstream tokens. After scoring, `track` outputs are cropped to `[range_start:range_end+1]` before being returned to the Evaluator.
+**Range handling.** When `prediction_ranges` is present, the input sequence is first cropped to `[0:range_end]` before scoring. Full upstream context is preserved because Evo2 is autoregressive and only conditions on upstream tokens. After scoring, `track` outputs are cropped to `[range_start:range_end]` before being returned to the Evaluator.
 
 ---
 
